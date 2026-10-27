@@ -59,10 +59,11 @@ pub async fn create(
         .fetch_one(&state.db)
         .await?;
     if !find_user(&state.db, owner_id).await?.is_pro {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM cash_books WHERE business_id = ?")
-            .bind(business_id)
-            .fetch_one(&state.db)
-            .await?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM cash_books WHERE business_id = ?")
+                .bind(business_id)
+                .fetch_one(&state.db)
+                .await?;
         if count >= state.config.free_max_cash_books {
             return Err(AppError::PlanLimit(format!(
                 "Free plan allows {} cash books per business. Upgrade to Pro for unlimited cash books.",
@@ -77,7 +78,10 @@ pub async fn create(
         .execute(&state.db)
         .await?
         .last_insert_rowid();
-    Ok((StatusCode::CREATED, Json(load_cash_book(&state.db, id).await?)))
+    Ok((
+        StatusCode::CREATED,
+        Json(load_cash_book(&state.db, id).await?),
+    ))
 }
 
 pub async fn delete(

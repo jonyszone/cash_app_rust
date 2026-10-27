@@ -1,4 +1,7 @@
-use cash_app_backend::{connect, routes, state::{AppState, Config}};
+use cash_app_backend::{
+    connect, routes,
+    state::{AppState, Config},
+};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 #[tokio::main]
@@ -15,7 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://cash_app.db".into());
     let bind = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8000".into());
 
-    let state = AppState { db: connect(&database_url).await?, config: Config::from_env() };
+    let state = AppState {
+        db: connect(&database_url).await?,
+        config: Config::from_env(),
+    };
     let app = routes::router(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());

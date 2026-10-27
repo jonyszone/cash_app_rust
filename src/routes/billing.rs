@@ -20,7 +20,9 @@ use crate::{
 
 pub async fn checkout(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
     if find_user(&state.db, auth.id).await?.is_pro {
-        return Err(AppError::Conflict("You are already on the Pro plan.".into()));
+        return Err(AppError::Conflict(
+            "You are already on the Pro plan.".into(),
+        ));
     }
     let session_id = random_token(40);
     sqlx::query("INSERT INTO checkout_sessions (id, user_id) VALUES (?, ?)")

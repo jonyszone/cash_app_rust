@@ -38,7 +38,12 @@ impl From<MemberRow> for TeamMember {
             business_id: r.business_id,
             role: r.role,
             created_at: r.created_at,
-            user: UserSummary { id: r.user_id, name: r.name, email: r.email, phone: r.phone },
+            user: UserSummary {
+                id: r.user_id,
+                name: r.name,
+                email: r.email,
+                phone: r.phone,
+            },
         }
     }
 }
@@ -89,16 +94,16 @@ pub async fn add(
         }
     };
     if role == Role::Partner && caller != Role::Owner {
-        return Err(AppError::Forbidden("Only the owner can add partners.".into()));
+        return Err(AppError::Forbidden(
+            "Only the owner can add partners.".into(),
+        ));
     }
 
     let user_id: i64 = sqlx::query_scalar("SELECT id FROM users WHERE email = ?")
         .bind(req.email.trim().to_lowercase())
         .fetch_optional(&state.db)
         .await?
-        .ok_or_else(|| {
-            AppError::Validation("No registered user found with that email.".into())
-        })?;
+        .ok_or_else(|| AppError::Validation("No registered user found with that email.".into()))?;
 
     let owner_id: i64 = sqlx::query_scalar("SELECT owner_id FROM businesses WHERE id = ?")
         .bind(business_id)
@@ -119,7 +124,11 @@ pub async fn add(
         }
     }
 
-    let role_str = if role == Role::Partner { "partner" } else { "member" };
+    let role_str = if role == Role::Partner {
+        "partner"
+    } else {
+        "member"
+    };
     let id = sqlx::query(
         "INSERT INTO team_members (business_id, user_id, role) VALUES (?, ?, ?)
          ON CONFLICT (business_id, user_id) DO NOTHING",
