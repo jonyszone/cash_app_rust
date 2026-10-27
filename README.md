@@ -21,6 +21,10 @@ The Flutter app's default `baseUrl` (`http://10.0.2.2:8000/api`) reaches this fr
 | `FREE_MAX_BUSINESSES` | `1` | Free-plan limits; exceeding one returns `403 {"error":"plan_limit"}`, which opens the app's paywall |
 | `FREE_MAX_CASH_BOOKS` | `2` | per business |
 | `FREE_MAX_TEAM_MEMBERS` | `2` | per business, excluding the owner |
+| `STRIPE_SECRET_KEY` | – | `sk_...`; enables real checkout |
+| `STRIPE_PRICE_ID` | – | `price_...` of the recurring Pro plan |
+| `STRIPE_WEBHOOK_SECRET` | – | `whsec_...` of the webhook endpoint |
+| `ALLOW_MOCK_CHECKOUT` | – | `true` for local development only: `/checkout` upgrades to Pro with no payment |
 
 ## API (all under `/api`, bearer-token auth except register/login)
 
@@ -48,7 +52,16 @@ Errors are `{"error": code, "message": text}`.
 - **partner** – edit business, manage cash books, add/remove members, delete any transaction.
 - **member** – view and add transactions; delete only their own.
 
-### Payments
-`/checkout` currently uses a built-in mock: the returned URL upgrades the user to Pro when opened. Replace `src/routes/billing.rs::complete` with a real provider webhook (e.g. Stripe) before production.
+### Payments (Stripe)
+`POST /checkout` creates a Stripe Checkout Session (subscription mode) and returns its URL, which the app opens in the browser. Pro is granted and revoked only by Stripe's signed webhooks, never by the client.
+
+Setup:
+1. In Stripe, create a recurring Price for the Pro plan and set `STRIPE_PRICE_ID` and `STRIPE_SECRET_KEY`.
+2. Add a webhook endpoint at `{PUBLIC_URL}/api/webhooks/stripe` for `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`; set its signing secret as `STRIPE_WEBHOOK_SECRET`.
+3. Set `PUBLIC_URL` to the server's public HTTPS address.
+
+Pro stays on while the subscription is `active` or `trialing`. Without Stripe configured, `/checkout` returns `503` unless `ALLOW_MOCK_CHECKOUT=true` (development only).
+
+For local testing, forward events with the Stripe CLI: `stripe listen --forward-to localhost:8000/api/webhooks/stripe`.
 
 Amounts are stored as integer cents.
