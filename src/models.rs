@@ -115,7 +115,9 @@ pub async fn business_role(db: &SqlitePool, business_id: i64, user_id: i64) -> A
             .bind(user_id)
             .fetch_optional(db)
             .await?;
-    role.as_deref().and_then(Role::parse).ok_or(AppError::NotFound)
+    role.as_deref()
+        .and_then(Role::parse)
+        .ok_or(AppError::NotFound)
 }
 
 pub async fn require_role(

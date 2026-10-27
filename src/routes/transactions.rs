@@ -45,7 +45,12 @@ impl From<TxRow> for Transaction {
             amount: r.amount_cents as f64 / 100.0,
             note: r.note,
             created_at: r.created_at,
-            user: UserSummary { id: r.user_id, name: r.name, email: r.email, phone: r.phone },
+            user: UserSummary {
+                id: r.user_id,
+                name: r.name,
+                email: r.email,
+                phone: r.phone,
+            },
         }
     }
 }
@@ -66,10 +71,12 @@ async fn authorize_book(db: &SqlitePool, cash_book_id: i64, user_id: i64) -> App
 }
 
 async fn touch_book(db: &SqlitePool, cash_book_id: i64) -> AppResult<()> {
-    sqlx::query("UPDATE cash_books SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?")
-        .bind(cash_book_id)
-        .execute(db)
-        .await?;
+    sqlx::query(
+        "UPDATE cash_books SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?",
+    )
+    .bind(cash_book_id)
+    .execute(db)
+    .await?;
     Ok(())
 }
 
@@ -111,16 +118,23 @@ pub async fn create(
 ) -> AppResult<(StatusCode, Json<Transaction>)> {
     authorize_book(&state.db, cash_book_id, auth.id).await?;
     if req.kind != "cash_in" && req.kind != "cash_out" {
-        return Err(AppError::Validation("Type must be 'cash_in' or 'cash_out'.".into()));
+        return Err(AppError::Validation(
+            "Type must be 'cash_in' or 'cash_out'.".into(),
+        ));
     }
     if !req.amount.is_finite() || req.amount <= 0.0 || req.amount > 1e12 {
-        return Err(AppError::Validation("Amount must be a positive number.".into()));
+        return Err(AppError::Validation(
+            "Amount must be a positive number.".into(),
+        ));
     }
     let amount_cents = (req.amount * 100.0).round() as i64;
     if amount_cents == 0 {
         return Err(AppError::Validation("Amount must be at least 0.01.".into()));
     }
-    let note = req.note.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    let note = req
+        .note
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty());
 
     let id = sqlx::query(
         "INSERT INTO transactions (cash_book_id, user_id, type, amount_cents, note) VALUES (?, ?, ?, ?, ?)",
@@ -148,14 +162,13 @@ pub async fn delete(
     Path((cash_book_id, transaction_id)): Path<(i64, i64)>,
 ) -> AppResult<StatusCode> {
     let role = authorize_book(&state.db, cash_book_id, auth.id).await?;
-    let author: i64 = sqlx::query_scalar(
-        "SELECT user_id FROM transactions WHERE id = ? AND cash_book_id = ?",
-    )
-    .bind(transaction_id)
-    .bind(cash_book_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or(AppError::NotFound)?;
+    let author: i64 =
+        sqlx::query_scalar("SELECT user_id FROM transactions WHERE id = ? AND cash_book_id = ?")
+            .bind(transaction_id)
+            .bind(cash_book_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or(AppError::NotFound)?;
     // Members may only delete entries they created; partners and owners may delete any.
     if role < Role::Partner && author != auth.id {
         return Err(AppError::Forbidden(

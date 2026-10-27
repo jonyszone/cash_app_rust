@@ -16,7 +16,11 @@ pub async fn connect(database_url: &str) -> BoxResult<SqlitePool> {
         .create_if_missing(true)
         .foreign_keys(true);
     // Each connection to an in-memory database is a separate database.
-    let max = if database_url.contains(":memory:") { 1 } else { 10 };
+    let max = if database_url.contains(":memory:") {
+        1
+    } else {
+        10
+    };
     let pool = SqlitePoolOptions::new()
         .max_connections(max)
         .connect_with(options)

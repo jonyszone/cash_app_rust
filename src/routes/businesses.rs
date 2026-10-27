@@ -47,14 +47,22 @@ pub async fn load_business(db: &SqlitePool, id: i64) -> AppResult<Business> {
         .ok_or(AppError::NotFound)
 }
 
-async fn with_books(db: &SqlitePool, business: Business, role: String) -> AppResult<BusinessWithBooks> {
+async fn with_books(
+    db: &SqlitePool,
+    business: Business,
+    role: String,
+) -> AppResult<BusinessWithBooks> {
     let cash_books = sqlx::query_as(&format!(
         "{CASH_BOOK_SELECT} WHERE cb.business_id = ? ORDER BY cb.updated_at DESC, cb.id DESC"
     ))
     .bind(business.id)
     .fetch_all(db)
     .await?;
-    Ok(BusinessWithBooks { business, role, cash_books })
+    Ok(BusinessWithBooks {
+        business,
+        role,
+        cash_books,
+    })
 }
 
 pub async fn list(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
@@ -137,7 +145,9 @@ pub async fn update(
     if let Some(name) = req.name {
         let name = name.trim().to_string();
         if name.is_empty() {
-            return Err(AppError::Validation("Business name cannot be empty.".into()));
+            return Err(AppError::Validation(
+                "Business name cannot be empty.".into(),
+            ));
         }
         business.name = name;
     }

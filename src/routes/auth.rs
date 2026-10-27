@@ -62,7 +62,9 @@ pub async fn register(
         .as_ref()
         .is_some_and(|c| c != &req.password)
     {
-        return Err(AppError::Validation("Password confirmation does not match.".into()));
+        return Err(AppError::Validation(
+            "Password confirmation does not match.".into(),
+        ));
     }
 
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = ?")
@@ -70,22 +72,31 @@ pub async fn register(
         .fetch_optional(&state.db)
         .await?;
     if exists.is_some() {
-        return Err(AppError::Validation("The email has already been taken.".into()));
+        return Err(AppError::Validation(
+            "The email has already been taken.".into(),
+        ));
     }
 
-    let phone = req.phone.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
-    let id = sqlx::query("INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)")
-        .bind(name)
-        .bind(&email)
-        .bind(phone)
-        .bind(hash_password(&req.password)?)
-        .execute(&state.db)
-        .await?
-        .last_insert_rowid();
+    let phone = req
+        .phone
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty());
+    let id =
+        sqlx::query("INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)")
+            .bind(name)
+            .bind(&email)
+            .bind(phone)
+            .bind(hash_password(&req.password)?)
+            .execute(&state.db)
+            .await?
+            .last_insert_rowid();
 
     let token = issue_token(&state, id).await?;
     let user = find_user(&state.db, id).await?;
-    Ok((StatusCode::CREATED, Json(json!({ "token": token, "user": user }))))
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "token": token, "user": user })),
+    ))
 }
 
 pub async fn login(
