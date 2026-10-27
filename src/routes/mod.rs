@@ -51,7 +51,10 @@ pub fn router(state: AppState) -> Router {
             delete(transactions::delete),
         )
         .route("/checkout", post(billing::checkout))
-        .route("/checkout/:session/complete", get(billing::complete));
+        .route("/checkout/:session/complete", get(billing::complete))
+        .route("/checkout/success", get(billing::success))
+        .route("/checkout/cancel", get(billing::cancel))
+        .route("/webhooks/stripe", post(billing::stripe_webhook));
 
     Router::new()
         .route("/health", get(|| async { "ok" }))

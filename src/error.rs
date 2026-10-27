@@ -15,6 +15,8 @@ pub enum AppError {
     Forbidden(String),
     #[error("{0}")]
     PlanLimit(String),
+    #[error("{0}")]
+    Unavailable(String),
     #[error("Not found.")]
     NotFound,
     #[error("{0}")]
@@ -35,6 +37,7 @@ impl IntoResponse for AppError {
             AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "forbidden"),
             // The Flutter client opens the paywall on 403 + error == "plan_limit".
             AppError::PlanLimit(_) => (StatusCode::FORBIDDEN, "plan_limit"),
+            AppError::Unavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
             AppError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             AppError::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             AppError::Db(_) | AppError::Internal(_) => {

@@ -11,12 +11,25 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-async fn app() -> Router {
+async fn app_with(config: Config) -> Router {
     let db = connect("sqlite::memory:").await.unwrap();
-    routes::router(AppState {
-        db,
-        config: Config::from_env(),
+    routes::router(AppState { db, config })
+}
+
+/// App with the development mock checkout enabled and default free-plan limits.
+async fn app() -> Router {
+    let defaults = Config::from_env();
+    app_with(Config {
+        allow_mock_checkout: true,
+        stripe_secret_key: None,
+        stripe_webhook_secret: None,
+        stripe_price_id: None,
+        free_max_businesses: 1,
+        free_max_cash_books: 2,
+        free_max_team_members: 2,
+        ..defaults
     })
+    .await
 }
 
 async fn call(
@@ -296,5 +309,116 @@ async fn full_flow() {
     assert_eq!(
         call(&app, "GET", "/api/me", Some(&alice), None).await.0,
         StatusCode::UNAUTHORIZED
+    );
+}
+
+fn signed(secret: &str, payload: &str) -> String {
+    use hmac::{Hmac, Mac};
+    let t = chrono::Utc::now().timestamp();
+    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(format!("{t}.{payload}").as_bytes());
+    format!("t={t},v1={}", hex::encode(mac.finalize().into_bytes()))
+}
+
+async fn webhook(app: &Router, signature: &str, payload: &str) -> StatusCode {
+    let req = Request::post("/api/webhooks/stripe")
+        .header("stripe-signature", signature)
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+    app.clone().oneshot(req).await.unwrap().status()
+}
+
+#[tokio::test]
+async fn checkout_is_unavailable_until_payments_are_configured() {
+    let app = app_with(Config {
+        allow_mock_checkout: false,
+        stripe_secret_key: None,
+        stripe_webhook_secret: None,
+        stripe_price_id: None,
+        ..Config::from_env()
+    })
+    .await;
+    let token = register(&app, "Al", "al@example.com").await;
+    let (s, _) = call(&app, "POST", "/api/checkout", Some(&token), None).await;
+    assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
+    // No webhook secret configured: nothing can grant Pro.
+    assert_eq!(
+        webhook(&app, "t=1,v1=00", "{}").await,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/me", Some(&token), None).await.1["is_pro"],
+        false
+    );
+}
+
+#[tokio::test]
+async fn stripe_webhooks_grant_and_revoke_pro() {
+    const SECRET: &str = "whsec_test";
+    let app = app_with(Config {
+        allow_mock_checkout: false,
+        stripe_webhook_secret: Some(SECRET.into()),
+        ..Config::from_env()
+    })
+    .await;
+    let token = register(&app, "Al", "al@example.com").await;
+    let user_id = call(&app, "GET", "/api/me", Some(&token), None).await.1["id"]
+        .as_i64()
+        .unwrap();
+
+    // Unsigned and wrongly signed events are rejected and change nothing.
+    let paid = json!({"type": "checkout.session.completed", "data": {"object": {
+        "client_reference_id": user_id.to_string(), "customer": "cus_1", "subscription": "sub_1"}}})
+    .to_string();
+    assert_eq!(
+        webhook(&app, "", &paid).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        webhook(&app, &signed("whsec_other", &paid), &paid).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/me", Some(&token), None).await.1["is_pro"],
+        false
+    );
+
+    // A signed payment event grants Pro.
+    assert_eq!(
+        webhook(&app, &signed(SECRET, &paid), &paid).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/me", Some(&token), None).await.1["is_pro"],
+        true
+    );
+
+    // Past-due subscription revokes it; active restores it; deletion revokes it.
+    let update = |status: &str| {
+        json!({"type": "customer.subscription.updated",
+        "data": {"object": {"id": "sub_1", "status": status}}})
+        .to_string()
+    };
+    for (status, expected) in [("past_due", false), ("active", true)] {
+        let body = update(status);
+        assert_eq!(
+            webhook(&app, &signed(SECRET, &body), &body).await,
+            StatusCode::OK
+        );
+        assert_eq!(
+            call(&app, "GET", "/api/me", Some(&token), None).await.1["is_pro"],
+            expected
+        );
+    }
+    let deleted = json!({"type": "customer.subscription.deleted",
+        "data": {"object": {"id": "sub_1", "status": "canceled"}}})
+    .to_string();
+    assert_eq!(
+        webhook(&app, &signed(SECRET, &deleted), &deleted).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/me", Some(&token), None).await.1["is_pro"],
+        false
     );
 }
