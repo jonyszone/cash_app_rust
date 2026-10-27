@@ -4,3 +4,5 @@ target/
 *.db*
 .env
 README.md
+docs/
+fly.toml

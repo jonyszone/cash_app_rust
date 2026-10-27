@@ -21,7 +21,7 @@ docker run -d -p 8000:8000 -v cash-app-data:/data \
   cash-app-backend
 ```
 
-The SQLite database lives in the `/data` volume, so keep it mounted or data is lost when the container is replaced. The container runs as a non-root user and serves plain HTTP; put it behind a reverse proxy or load balancer that terminates HTTPS. Use `GET /health` for health checks.
+The SQLite database lives in the `/data` volume, so keep it mounted or data is lost when the container is replaced. The container runs as a non-root user and serves plain HTTP; put it behind a reverse proxy or load balancer that terminates HTTPS. Use `GET /health` for health checks. For a step-by-step Fly.io deployment, see [docs/deploy-fly.md](docs/deploy-fly.md).
 
 ### Configuration (env vars or `.env`)
 
