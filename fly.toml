@@ -1,0 +1,31 @@
+# Fly.io config. Change `app` (must be globally unique), `primary_region` and PUBLIC_URL.
+# Full walkthrough: docs/deploy-fly.md
+app = "cash-app-backend"
+primary_region = "iad"
+
+[env]
+  PUBLIC_URL = "https://cash-app-backend.fly.dev"
+
+# SQLite lives on a Fly volume, which can attach to only one machine.
+[mounts]
+  source = "cash_app_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
