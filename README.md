@@ -11,6 +11,18 @@ cargo test
 
 The Flutter app's default `baseUrl` (`http://10.0.2.2:8000/api`) reaches this from the Android emulator.
 
+### Docker
+
+```sh
+docker build -t cash-app-backend .
+docker run -d -p 8000:8000 -v cash-app-data:/data \
+  -e PUBLIC_URL=https://api.example.com \
+  -e STRIPE_SECRET_KEY=sk_... -e STRIPE_PRICE_ID=price_... -e STRIPE_WEBHOOK_SECRET=whsec_... \
+  cash-app-backend
+```
+
+The SQLite database lives in the `/data` volume, so keep it mounted or data is lost when the container is replaced. The container runs as a non-root user and serves plain HTTP; put it behind a reverse proxy or load balancer that terminates HTTPS. Use `GET /health` for health checks.
+
 ### Configuration (env vars or `.env`)
 
 | Variable | Default | |

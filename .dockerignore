@@ -1,0 +1,6 @@
+target/
+.git/
+.github/
+*.db*
+.env
+README.md
