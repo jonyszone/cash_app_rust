@@ -1,5 +1,7 @@
 # Cash App Backend
 
+[![CI](https://github.com/jonyszone/cash_app_rust/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jonyszone/cash_app_rust/actions/workflows/ci.yml)
+
 Rust (axum + SQLite) REST API for the [cash_app_flutter](https://github.com/jonyszone/cash_app_flutter) client.
 
 ## Run
